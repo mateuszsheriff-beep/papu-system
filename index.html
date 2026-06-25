@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restauracja PAPU - System</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Prosty CSS dla responsywności i widoków */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f4f4f9; }
+        .hidden { display: none !important; }
+        .view-container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+        .table-btn { padding: 20px; text-align: center; background: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 5px; }
+        .table-btn.occupied { background: #f44336; }
+        
+        /* Draggable elements dla szefa */
+        #boss-tables { position: relative; height: 500px; background: #eee; border: 2px dashed #ccc; }
+        .draggable-table { position: absolute; width: 60px; height: 60px; background: #333; color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: grab; }
+
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        .kanban { display: flex; gap: 20px; }
+        .kanban-col { flex: 1; background: #fafafa; padding: 10px; border: 1px solid #ddd; min-height: 300px; }
+    </style>
+</head>
+<body>
+
+    <!-- WIDOK LOGOWANIA -->
+    <div id="login-view" class="view-container">
+        <h1>Witaj w Restauracji PAPU</h1>
+        <div id="datetime"></div>
+        <h3>Logowanie Pracownika</h3>
+        <input type="text" id="username" placeholder="Nazwa użytkownika">
+        <input type="password" id="pin" placeholder="PIN">
+        <button onclick="login()">Zaloguj się</button>
+    </div>
+
+    <!-- GŁÓWNY SYSTEM (Po zalogowaniu) -->
+    <div id="app-view" class="view-container hidden">
+        <header>
+            <h2 id="user-info">Zalogowano jako: </h2>
+            <div id="clock"></div>
+            <button onclick="logout()">Wyloguj</button>
+        </header>
+
+        <!-- PANEL KELNERA -->
+        <div id="waiter-panel" class="hidden">
+            <h3>Sala (Wybierz stół)</h3>
+            <div id="tables-grid" class="grid"></div>
+            
+            <!-- Modal Zamówienia -->
+            <div id="order-modal" class="hidden" style="margin-top:20px; border-top: 1px solid black; padding-top:20px;">
+                <h3 id="selected-table-title"></h3>
+                <div>
+                    <label>Dodaj danie:</label>
+                    <select id="menu-select"></select>
+                    <input type="text" id="special-request" placeholder="Uwagi (np. bez cytryny)">
+                    <button onclick="addDishToOrder()">Dodaj</button>
+                </div>
+                <h4>Rachunek:</h4>
+                <ul id="current-order-list"></ul>
+                
+                <div id="payment-section">
+                    <p>Kwota do zapłaty: <strong id="total-price">0.00</strong> zł</p>
+                    <input type="number" id="tip-input" placeholder="Napiwek">
+                    <input type="number" id="banknote-input" placeholder="Otrzymany banknot (np. 100)">
+                    <button onclick="calculateChange()">Oblicz resztę</button>
+                    <p>Reszta do wydania: <strong id="change-due">0.00</strong> zł</p>
+                    <button onclick="finalizeOrder()">Zakończ i Rozlicz</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL KUCHNI -->
+        <div id="kitchen-panel" class="hidden">
+            <h3>Kuchnia - Zamówienia</h3>
+            <div class="kanban">
+                <div class="kanban-col" id="k-new"><h4>Oczekujące</h4></div>
+                <div class="kanban-col" id="k-prep"><h4>W przygotowaniu</h4></div>
+                <div class="kanban-col" id="k-ready"><h4>Do odbioru</h4></div>
+            </div>
+        </div>
+
+        <!-- PANEL SZEFA -->
+        <div id="boss-panel" class="hidden">
+            <h3>Panel Właściciela</h3>
+            <p>Ilość klientów dziś: <strong id="daily-clients">0</strong></p>
+            
+            <h4>Stan Kasy</h4>
+            <input type="number" id="start-cash" placeholder="Kasa na początek dnia">
+            <button onclick="setStartCash()">Zatwierdź początek</button>
+            <p>Stan kasy obecnie: <strong id="current-cash-display">0.00</strong> zł</p>
+
+            <h4>Edytor Sali (Przeciągnij stoły)</h4>
+            <div id="boss-tables"></div>
+            <button onclick="saveTableLayout()">Zapisz układ stołów</button>
+
+            <h4>Notatki firmowe</h4>
+            <textarea id="note-content" rows="4" style="width:100%"></textarea>
+            <button onclick="addNote()">Dodaj notatkę</button>
+            <ul id="notes-list"></ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
