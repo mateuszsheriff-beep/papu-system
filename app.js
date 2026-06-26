@@ -1,5 +1,5 @@
 // 1. INICJALIZACJA SUPABASE (Zmień na swoje klucze z Settings -> API w Supabase)
-const SUPABASE_URL = 'https://TWÓJ_PROJEKT.supabase.co';
+const SUPABASE_URL = 'https://ckczdzdyydcxppstkqtb.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrY3pkemR5eWRjeHBwc3RrcXRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MTA3NTMsImV4cCI6MjA5Nzk4Njc1M30.HSDRUEze1HD33Muv7krdTxn3F_AftfGrm9kJC63Q5sE';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
