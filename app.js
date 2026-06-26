@@ -1,7 +1,9 @@
-// 1. INICJALIZACJA SUPABASE (Zmień na swoje klucze z Settings -> API w Supabase)
+// 1. INICJALIZACJA SUPABASE
 const SUPABASE_URL = 'https://ckczdzdyydcxppstkqtb.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrY3pkemR5eWRjeHBwc3RrcXRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MTA3NTMsImV4cCI6MjA5Nzk4Njc1M30.HSDRUEze1HD33Muv7krdTxn3F_AftfGrm9kJC63Q5sE';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ZMIANA: Nazywamy klienta 'db' (database), aby nie nadpisywać globalnej zmiennej 'supabase'
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
 let currentTable = null;
@@ -21,7 +23,7 @@ async function login() {
     const username = document.getElementById('username').value;
     const pin = document.getElementById('pin').value;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
         .from('users')
         .select('*')
         .eq('username', username)
@@ -69,7 +71,7 @@ function loadRoleView(role) {
 
 // --- SYSTEM KELNERA ---
 async function loadTablesForWaiter() {
-    const { data, error } = await supabase.from('restaurant_tables').select('*').order('table_number');
+    const { data, error } = await db.from('restaurant_tables').select('*').order('table_number');
     const grid = document.getElementById('tables-grid');
     grid.innerHTML = '';
     data.forEach(table => {
@@ -82,7 +84,7 @@ async function loadTablesForWaiter() {
 }
 
 async function loadMenu() {
-    const { data } = await supabase.from('menu').select('*');
+    const { data } = await db.from('menu').select('*');
     const select = document.getElementById('menu-select');
     select.innerHTML = '';
     data.forEach(item => {
@@ -100,17 +102,17 @@ async function openTable(table) {
     document.getElementById('selected-table-title').innerText = `Obsługa: Stół ${table.table_number}`;
     
     // Sprawdź czy jest aktywne zamówienie
-    const { data } = await supabase.from('orders').select('*').eq('table_id', table.id).eq('status', 'new').single();
+    const { data } = await db.from('orders').select('*').eq('table_id', table.id).eq('status', 'new').single();
     
     if (data) {
         currentOrderId = data.id;
         currentOrderTotal = data.total_amount;
     } else {
         // Stwórz nowe zamówienie
-        const { data: newOrder } = await supabase.from('orders').insert([{ table_id: table.id, waiter_id: currentUser.id }]).select().single();
+        const { data: newOrder } = await db.from('orders').insert([{ table_id: table.id, waiter_id: currentUser.id }]).select().single();
         currentOrderId = newOrder.id;
         currentOrderTotal = 0;
-        await supabase.from('restaurant_tables').update({ status: 'occupied' }).eq('id', table.id);
+        await db.from('restaurant_tables').update({ status: 'occupied' }).eq('id', table.id);
         loadTablesForWaiter();
     }
     refreshOrderList();
@@ -122,17 +124,17 @@ async function addDishToOrder() {
     const price = parseFloat(select.options[select.selectedIndex].dataset.price);
     const notes = document.getElementById('special-request').value;
 
-    await supabase.from('order_items').insert([{ order_id: currentOrderId, menu_id: menuId, special_requests: notes }]);
+    await db.from('order_items').insert([{ order_id: currentOrderId, menu_id: menuId, special_requests: notes }]);
     
     currentOrderTotal += price;
-    await supabase.from('orders').update({ total_amount: currentOrderTotal }).eq('id', currentOrderId);
+    await db.from('orders').update({ total_amount: currentOrderTotal }).eq('id', currentOrderId);
     
     document.getElementById('special-request').value = '';
     refreshOrderList();
 }
 
 async function refreshOrderList() {
-    const { data } = await supabase.from('order_items').select('*, menu(*)').eq('order_id', currentOrderId);
+    const { data } = await db.from('order_items').select('*, menu(*)').eq('order_id', currentOrderId);
     const list = document.getElementById('current-order-list');
     list.innerHTML = '';
     data.forEach(item => {
@@ -159,13 +161,13 @@ async function finalizeOrder() {
     const tip = parseFloat(document.getElementById('tip-input').value || 0);
     
     // Zakończ zamówienie
-    await supabase.from('orders').update({ status: 'paid', tip: tip }).eq('id', currentOrderId);
-    await supabase.from('restaurant_tables').update({ status: 'free' }).eq('id', currentTable.id);
+    await db.from('orders').update({ status: 'paid', tip: tip }).eq('id', currentOrderId);
+    await db.from('restaurant_tables').update({ status: 'free' }).eq('id', currentTable.id);
     
-    // Aktualizacja kasy (w dużym uproszczeniu: pobieramy dzisiejszy stan i dodajemy)
-    const { data: cashData } = await supabase.from('cash_register').select('*').eq('work_date', new Date().toISOString().split('T')[0]).single();
+    // Aktualizacja kasy
+    const { data: cashData } = await db.from('cash_register').select('*').eq('work_date', new Date().toISOString().split('T')[0]).single();
     if(cashData) {
-        await supabase.from('cash_register').update({ current_cash: parseFloat(cashData.current_cash) + currentOrderTotal }).eq('id', cashData.id);
+        await db.from('cash_register').update({ current_cash: parseFloat(cashData.current_cash) + currentOrderTotal }).eq('id', cashData.id);
     }
 
     document.getElementById('order-modal').classList.add('hidden');
@@ -175,7 +177,7 @@ async function finalizeOrder() {
 
 // --- SYSTEM KUCHNI ---
 async function loadKitchenOrders() {
-    const { data } = await supabase.from('order_items').select('*, menu(*), orders(table_id)').in('status', ['pending', 'prep']);
+    const { data } = await db.from('order_items').select('*, menu(*), orders(table_id)').in('status', ['pending', 'prep']);
     
     document.getElementById('k-new').innerHTML = '<h4>Oczekujące</h4>';
     document.getElementById('k-prep').innerHTML = '<h4>W przygotowaniu</h4>';
@@ -200,45 +202,40 @@ async function loadKitchenOrders() {
 }
 
 async function updateKitchenStatus(itemId, status) {
-    await supabase.from('order_items').update({ status: status }).eq('id', itemId);
-    loadKitchenOrders(); // odśwież
+    await db.from('order_items').update({ status: status }).eq('id', itemId);
+    loadKitchenOrders();
 }
 
-// --- SYSTEM SZEFA (Edytor stołów i statystyki) ---
+// --- SYSTEM SZEFA ---
 async function loadBossPanel() {
-    // Pobierz notatki
-    const { data: notes } = await supabase.from('notes').select('*');
+    const { data: notes } = await db.from('notes').select('*');
     const ul = document.getElementById('notes-list');
     ul.innerHTML = '';
     notes.forEach(n => ul.innerHTML += `<li>${new Date(n.created_at).toLocaleDateString()}: ${n.content}</li>`);
 
-    // Stan kasy
-    const { data: cashData } = await supabase.from('cash_register').select('*').eq('work_date', new Date().toISOString().split('T')[0]).single();
+    const { data: cashData } = await db.from('cash_register').select('*').eq('work_date', new Date().toISOString().split('T')[0]).single();
     if(cashData) document.getElementById('current-cash-display').innerText = cashData.current_cash;
 
-    // Pobieranie zamówień dla ilości klientów (jedno zamówienie = 1 stolik = grupa klientów)
-    const { data: orders } = await supabase.from('orders').select('id').eq('status', 'paid');
+    const { data: orders } = await db.from('orders').select('id').eq('status', 'paid');
     document.getElementById('daily-clients').innerText = orders ? orders.length : 0;
 
-    // Załaduj wizualizację stołów (Drag and Drop)
     loadBossTables();
 }
 
 async function setStartCash() {
     const amount = document.getElementById('start-cash').value;
-    await supabase.from('cash_register').insert([{ start_cash: amount, current_cash: amount }]);
+    await db.from('cash_register').insert([{ start_cash: amount, current_cash: amount }]);
     loadBossPanel();
 }
 
 async function addNote() {
     const content = document.getElementById('note-content').value;
-    await supabase.from('notes').insert([{ author_id: currentUser.id, content: content }]);
+    await db.from('notes').insert([{ author_id: currentUser.id, content: content }]);
     loadBossPanel();
 }
 
-// Logika Drag&Drop dla stolików
 async function loadBossTables() {
-    const { data } = await supabase.from('restaurant_tables').select('*');
+    const { data } = await db.from('restaurant_tables').select('*');
     const container = document.getElementById('boss-tables');
     container.innerHTML = '';
     
@@ -250,7 +247,6 @@ async function loadBossTables() {
         div.style.top = table.pos_y + 'px';
         div.dataset.id = table.id;
         
-        // Prosty system Drag
         div.onmousedown = function(e) {
             let shiftX = e.clientX - div.getBoundingClientRect().left;
             let shiftY = e.clientY - div.getBoundingClientRect().top;
@@ -280,7 +276,7 @@ async function saveTableLayout() {
         const id = table.dataset.id;
         const x = parseInt(table.style.left) || 0;
         const y = parseInt(table.style.top) || 0;
-        await supabase.from('restaurant_tables').update({ pos_x: x, pos_y: y }).eq('id', id);
+        await db.from('restaurant_tables').update({ pos_x: x, pos_y: y }).eq('id', id);
     }
     alert('Zapisano układ!');
 }
